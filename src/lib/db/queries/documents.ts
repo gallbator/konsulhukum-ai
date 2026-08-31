@@ -68,6 +68,7 @@ export interface LegalDocumentSummary {
   title: string;
   number: string | null;
   year: number | null;
+  urlAsli: string | null;
   chunkCount: number;
   createdAt: string;
 }
@@ -76,7 +77,7 @@ export async function listDocuments(): Promise<LegalDocumentSummary[]> {
   const supabase = createSupabaseServerClient();
   const { data, error } = await supabase
     .from("legal_documents")
-    .select("id, source_type, title, number, year, created_at, document_chunks(count)")
+    .select("id, source_type, title, number, year, url_asli, created_at, document_chunks(count)")
     .order("created_at", { ascending: false });
   if (error) throw error;
   return (
@@ -86,6 +87,7 @@ export async function listDocuments(): Promise<LegalDocumentSummary[]> {
       title: string;
       number: string | null;
       year: number | null;
+      url_asli: string | null;
       created_at: string;
       document_chunks: { count: number }[];
     }[]
@@ -95,6 +97,7 @@ export async function listDocuments(): Promise<LegalDocumentSummary[]> {
     title: row.title,
     number: row.number,
     year: row.year,
+    urlAsli: row.url_asli,
     chunkCount: row.document_chunks[0]?.count ?? 0,
     createdAt: row.created_at,
   }));

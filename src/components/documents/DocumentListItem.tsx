@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import type { LegalDocumentSummary } from "@/types";
-import { FileTextIcon, TrashIcon } from "@/components/ui/icons";
+import { ExternalLinkIcon, FileTextIcon, TrashIcon } from "@/components/ui/icons";
 
 const SOURCE_TYPE_LABELS: Record<string, string> = {
   uu: "UU",
@@ -61,14 +61,28 @@ export function DocumentListItem({ document, onDelete }: DocumentListItemProps) 
           </p>
         </div>
       </div>
-      <button
-        type="button"
-        aria-label="Hapus dokumen"
-        onClick={() => setIsConfirmingDelete(true)}
-        className="shrink-0 rounded p-1 text-muted-foreground opacity-0 hover:bg-border group-hover:opacity-100"
-      >
-        <TrashIcon className="h-3.5 w-3.5" />
-      </button>
+      <span className="flex shrink-0 items-center gap-0.5 opacity-0 group-hover:opacity-100">
+        {document.urlAsli && (
+          <a
+            href={document.urlAsli}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="Lihat file asli di Google Drive"
+            title="Lihat file asli di Google Drive"
+            className="rounded p-1 text-muted-foreground hover:bg-border"
+          >
+            <ExternalLinkIcon className="h-3.5 w-3.5" />
+          </a>
+        )}
+        <button
+          type="button"
+          aria-label="Hapus dokumen"
+          onClick={() => setIsConfirmingDelete(true)}
+          className="rounded p-1 text-muted-foreground hover:bg-border"
+        >
+          <TrashIcon className="h-3.5 w-3.5" />
+        </button>
+      </span>
     </div>
   );
 }

@@ -30,7 +30,9 @@ export function useDocuments() {
   }, [load]);
 
   const upload = useCallback(
-    async (input: UploadDocumentInput): Promise<{ ok: true } | { ok: false; error: string }> => {
+    async (
+      input: UploadDocumentInput
+    ): Promise<{ ok: true; driveWarning: string | null } | { ok: false; error: string }> => {
       const form = new FormData();
       form.set("file", input.file);
       form.set("sourceType", input.sourceType);
@@ -44,7 +46,7 @@ export function useDocuments() {
         return { ok: false, error: data.error ?? "Gagal mengupload dokumen." };
       }
       await load();
-      return { ok: true };
+      return { ok: true, driveWarning: data.driveError ?? null };
     },
     [load]
   );

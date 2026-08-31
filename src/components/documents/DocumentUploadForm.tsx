@@ -5,7 +5,9 @@ import type { UploadDocumentInput } from "@/hooks/useDocuments";
 import { UploadIcon } from "@/components/ui/icons";
 
 interface DocumentUploadFormProps {
-  onUpload: (input: UploadDocumentInput) => Promise<{ ok: true } | { ok: false; error: string }>;
+  onUpload: (
+    input: UploadDocumentInput
+  ) => Promise<{ ok: true; driveWarning: string | null } | { ok: false; error: string }>;
 }
 
 const SOURCE_TYPE_OPTIONS = [
@@ -24,6 +26,7 @@ export function DocumentUploadForm({ onUpload }: DocumentUploadFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [driveWarning, setDriveWarning] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   async function handleSubmit(e: FormEvent) {
@@ -35,6 +38,7 @@ export function DocumentUploadForm({ onUpload }: DocumentUploadFormProps) {
     setIsSubmitting(true);
     setError(null);
     setSuccess(null);
+    setDriveWarning(null);
 
     const result = await onUpload({ file, sourceType, title, number, year });
 
@@ -44,6 +48,9 @@ export function DocumentUploadForm({ onUpload }: DocumentUploadFormProps) {
       return;
     }
     setSuccess(`"${title}" berhasil diproses dan siap dirujuk di percakapan.`);
+    if (result.driveWarning) {
+      setDriveWarning(`Teks dokumen berhasil diproses, tapi gagal mengupload file asli ke Google Drive: ${result.driveWarning}`);
+    }
     setFile(null);
     setTitle("");
     setNumber("");
@@ -114,6 +121,7 @@ export function DocumentUploadForm({ onUpload }: DocumentUploadFormProps) {
 
       {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
       {success && <p className="text-sm text-emerald-600 dark:text-emerald-400">{success}</p>}
+      {driveWarning && <p className="text-sm text-amber-600 dark:text-amber-400">{driveWarning}</p>}
 
       <button
         type="submit"

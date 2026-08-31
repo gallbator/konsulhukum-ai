@@ -3,6 +3,7 @@ import { listDocuments } from "@/lib/db/queries/documents";
 import { getOrCreateSource } from "@/lib/db/queries/sources";
 import { ingestExtractedDocument } from "@/lib/ingestion/ingestOne";
 import { extractPdfText } from "@/lib/utils/pdf";
+import { uploadPdfToDrive } from "@/lib/storage/googleDrive";
 
 // PDF fetch/parse + embedding of every chunk can take a while for a long document.
 export const maxDuration = 90;
@@ -37,15 +38,34 @@ export async function POST(req: Request) {
   }
 
   const bytes = new Uint8Array(await file.arrayBuffer());
-  let rawText: string;
-  try {
-    rawText = await extractPdfText(bytes);
-  } catch (err) {
-    console.error("[api/documents] PDF parse failed", err);
+
+  // Independent I/O (text extraction reads the bytes locally, Drive upload
+  // sends them over the network) — run concurrently rather than sequentially.
+  const driveFilename = `${sourceType}-${number}-${year}.pdf`.replace(/[\\/]/g, "-");
+  const [textResult, driveResult] = await Promise.allSettled([
+    extractPdfText(bytes),
+    uploadPdfToDrive(bytes, driveFilename),
+  ]);
+
+  if (textResult.status === "rejected") {
+    console.error("[api/documents] PDF parse failed", textResult.reason);
     return NextResponse.json({ error: "Gagal membaca isi PDF. Pastikan file tidak rusak atau terenkripsi." }, { status: 422 });
   }
+  const rawText = textResult.value;
   if (!rawText.trim()) {
     return NextResponse.json({ error: "Tidak ada teks yang bisa diekstrak dari PDF ini (kemungkinan hasil scan tanpa OCR)." }, { status: 422 });
+  }
+
+  let driveError: string | null = null;
+  let urlAsli: string | undefined;
+  if (driveResult.status === "fulfilled") {
+    urlAsli = driveResult.value.webViewLink;
+  } else {
+    // Non-fatal: the document is still useful for RAG without the original
+    // file backed up, so don't block ingestion — just surface the failure.
+    console.error("[api/documents] Google Drive upload failed", driveResult.reason);
+    driveError =
+      driveResult.reason instanceof Error ? driveResult.reason.message : "Gagal mengupload file asli ke Google Drive.";
   }
 
   const source = await getOrCreateSource({
@@ -54,6 +74,6 @@ export async function POST(req: Request) {
     adapterKey: "manual-upload",
   });
 
-  const outcome = await ingestExtractedDocument(source.id, { sourceType, title, number, year }, rawText);
-  return NextResponse.json(outcome, { status: 201 });
+  const outcome = await ingestExtractedDocument(source.id, { sourceType, title, number, year, urlAsli }, rawText);
+  return NextResponse.json({ ...outcome, driveError }, { status: 201 });
 }
