@@ -3,9 +3,14 @@ import { listDocuments } from "@/lib/db/queries/documents";
 import { getOrCreateSource } from "@/lib/db/queries/sources";
 import { ingestExtractedDocument } from "@/lib/ingestion/ingestOne";
 import { extractPdfText } from "@/lib/utils/pdf";
-import { uploadPdfToDrive } from "@/lib/storage/googleDrive";
+import { downloadPdfFromDrive } from "@/lib/storage/googleDrive";
 
-// PDF fetch/parse + embedding of every chunk can take a while for a long document.
+// GET reads no request-specific input (no searchParams/cookies/etc.), so
+// Next.js would otherwise statically render/cache it — freezing the list at
+// whatever it was on first request instead of reflecting new uploads/deletes.
+export const dynamic = "force-dynamic";
+
+// Downloading a large PDF back from Drive + parse/embedding every chunk can take a while.
 export const maxDuration = 90;
 
 const ALLOWED_SOURCE_TYPES = ["uu", "pp", "perpres", "putusan"];
@@ -15,16 +20,19 @@ export async function GET() {
   return NextResponse.json({ documents });
 }
 
+// The browser has already uploaded the PDF straight to Drive (see
+// /api/documents/init-upload) — this only ever receives small JSON, never
+// the file itself, specifically to stay under Vercel's request body limit.
 export async function POST(req: Request) {
-  const form = await req.formData();
-  const file = form.get("file");
-  const sourceType = String(form.get("sourceType") ?? "");
-  const title = String(form.get("title") ?? "").trim();
-  const number = String(form.get("number") ?? "").trim();
-  const yearRaw = String(form.get("year") ?? "").trim();
+  const body = await req.json().catch(() => ({}));
+  const driveFileId = String(body.driveFileId ?? "").trim();
+  const sourceType = String(body.sourceType ?? "");
+  const title = String(body.title ?? "").trim();
+  const number = String(body.number ?? "").trim();
+  const yearRaw = String(body.year ?? "").trim();
 
-  if (!(file instanceof File)) {
-    return NextResponse.json({ error: "File PDF wajib diisi." }, { status: 400 });
+  if (!driveFileId) {
+    return NextResponse.json({ error: "File belum berhasil diupload ke Google Drive." }, { status: 400 });
   }
   if (!ALLOWED_SOURCE_TYPES.includes(sourceType)) {
     return NextResponse.json({ error: "Jenis dokumen tidak valid." }, { status: 400 });
@@ -37,35 +45,26 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Tahun harus berupa angka." }, { status: 400 });
   }
 
-  const bytes = new Uint8Array(await file.arrayBuffer());
+  let bytes: Uint8Array;
+  let urlAsli: string;
+  try {
+    const downloaded = await downloadPdfFromDrive(driveFileId);
+    bytes = downloaded.bytes;
+    urlAsli = downloaded.webViewLink;
+  } catch (err) {
+    console.error("[api/documents] Drive download failed", err);
+    return NextResponse.json({ error: "Gagal mengambil file dari Google Drive." }, { status: 502 });
+  }
 
-  // Independent I/O (text extraction reads the bytes locally, Drive upload
-  // sends them over the network) — run concurrently rather than sequentially.
-  const driveFilename = `${sourceType}-${number}-${year}.pdf`.replace(/[\\/]/g, "-");
-  const [textResult, driveResult] = await Promise.allSettled([
-    extractPdfText(bytes),
-    uploadPdfToDrive(bytes, driveFilename),
-  ]);
-
-  if (textResult.status === "rejected") {
-    console.error("[api/documents] PDF parse failed", textResult.reason);
+  let rawText: string;
+  try {
+    rawText = await extractPdfText(bytes);
+  } catch (err) {
+    console.error("[api/documents] PDF parse failed", err);
     return NextResponse.json({ error: "Gagal membaca isi PDF. Pastikan file tidak rusak atau terenkripsi." }, { status: 422 });
   }
-  const rawText = textResult.value;
   if (!rawText.trim()) {
     return NextResponse.json({ error: "Tidak ada teks yang bisa diekstrak dari PDF ini (kemungkinan hasil scan tanpa OCR)." }, { status: 422 });
-  }
-
-  let driveError: string | null = null;
-  let urlAsli: string | undefined;
-  if (driveResult.status === "fulfilled") {
-    urlAsli = driveResult.value.webViewLink;
-  } else {
-    // Non-fatal: the document is still useful for RAG without the original
-    // file backed up, so don't block ingestion — just surface the failure.
-    console.error("[api/documents] Google Drive upload failed", driveResult.reason);
-    driveError =
-      driveResult.reason instanceof Error ? driveResult.reason.message : "Gagal mengupload file asli ke Google Drive.";
   }
 
   const source = await getOrCreateSource({
@@ -75,5 +74,5 @@ export async function POST(req: Request) {
   });
 
   const outcome = await ingestExtractedDocument(source.id, { sourceType, title, number, year, urlAsli }, rawText);
-  return NextResponse.json({ ...outcome, driveError }, { status: 201 });
+  return NextResponse.json(outcome, { status: 201 });
 }
