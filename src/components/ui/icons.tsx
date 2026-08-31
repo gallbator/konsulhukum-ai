@@ -95,6 +95,24 @@ export function ChevronDownIcon({ className }: IconProps) {
   );
 }
 
+export function FileTextIcon({ className }: IconProps) {
+  return (
+    <svg {...base} className={className}>
+      <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5Z" />
+      <path d="M14 2v6h6M8 13h8M8 17h8M8 9h2" />
+    </svg>
+  );
+}
+
+export function UploadIcon({ className }: IconProps) {
+  return (
+    <svg {...base} className={className}>
+      <path d="M12 16V4M6 10l6-6 6 6" />
+      <path d="M4 18v1a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-1" />
+    </svg>
+  );
+}
+
 export function ScaleIcon({ className }: IconProps) {
   return (
     <svg {...base} className={className}>

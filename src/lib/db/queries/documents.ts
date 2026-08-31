@@ -62,6 +62,50 @@ export async function insertDocument(input: {
   return data as LegalDocumentRow;
 }
 
+export interface LegalDocumentSummary {
+  id: string;
+  sourceType: string;
+  title: string;
+  number: string | null;
+  year: number | null;
+  chunkCount: number;
+  createdAt: string;
+}
+
+export async function listDocuments(): Promise<LegalDocumentSummary[]> {
+  const supabase = createSupabaseServerClient();
+  const { data, error } = await supabase
+    .from("legal_documents")
+    .select("id, source_type, title, number, year, created_at, document_chunks(count)")
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return (
+    data as unknown as {
+      id: string;
+      source_type: string;
+      title: string;
+      number: string | null;
+      year: number | null;
+      created_at: string;
+      document_chunks: { count: number }[];
+    }[]
+  ).map((row) => ({
+    id: row.id,
+    sourceType: row.source_type,
+    title: row.title,
+    number: row.number,
+    year: row.year,
+    chunkCount: row.document_chunks[0]?.count ?? 0,
+    createdAt: row.created_at,
+  }));
+}
+
+export async function deleteDocument(id: string): Promise<void> {
+  const supabase = createSupabaseServerClient();
+  const { error } = await supabase.from("legal_documents").delete().eq("id", id);
+  if (error) throw error;
+}
+
 export async function deleteChunksForDocument(documentId: string): Promise<void> {
   const supabase = createSupabaseServerClient();
   const { error } = await supabase.from("document_chunks").delete().eq("document_id", documentId);

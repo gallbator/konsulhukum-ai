@@ -34,3 +34,5 @@ export interface Message {
   citations: Citation[];
   createdAt: string;
 }
+
+export type { LegalDocumentSummary } from "@/lib/db/queries/documents";
