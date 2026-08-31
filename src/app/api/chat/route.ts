@@ -1,6 +1,7 @@
 import { convertToModelMessages, stepCountIs, streamText, tool, type UIMessage } from "ai";
 import { z } from "zod";
 import { getChatModel } from "@/lib/ai/chatModel";
+import { isValidChatModelId } from "@/lib/ai/models";
 import { buildGroundedSystemPrompt, type ContextChunkForPrompt } from "@/lib/ai/prompt";
 import { generateConversationTitle } from "@/lib/ai/title";
 import { rewriteQueryForRetrieval } from "@/lib/ai/queryRewrite";
@@ -20,6 +21,7 @@ export const maxDuration = 90;
 interface ChatRequestBody {
   id: string; // conversationId (Chat's `id` doubles as the conversation id)
   messages: UIMessage[];
+  model?: string;
 }
 
 function toPromptChunk(c: RetrievedChunk): ContextChunkForPrompt {
@@ -33,7 +35,10 @@ function toPromptChunk(c: RetrievedChunk): ContextChunkForPrompt {
 }
 
 export async function POST(req: Request) {
-  const { id: conversationId, messages }: ChatRequestBody = await req.json();
+  const { id: conversationId, messages, model }: ChatRequestBody = await req.json();
+  // Only trust a model id from the whitelist — never pass user-controlled
+  // input straight through to the OpenRouter model slug.
+  const chatModelId = isValidChatModelId(model) ? model : undefined;
 
   const incomingUserMessage = lastUserMessage(messages);
   const question = incomingUserMessage ? extractText(incomingUserMessage) : "";
@@ -100,7 +105,7 @@ export async function POST(req: Request) {
   });
 
   const result = streamText({
-    model: getChatModel(),
+    model: getChatModel(chatModelId),
     system: buildGroundedSystemPrompt(primary.map(toPromptChunk), related.map(toPromptChunk)),
     messages: await convertToModelMessages(messages),
     tools: { lookupRegulation: lookupRegulationTool },

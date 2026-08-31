@@ -50,7 +50,8 @@ export function useConversations() {
   }, []);
 
   const remove = useCallback(async (id: string) => {
-    await fetch(`/api/conversations/${id}`, { method: "DELETE" });
+    const res = await fetch(`/api/conversations/${id}`, { method: "DELETE" });
+    if (!res.ok) return;
     setConversations((prev) => prev.filter((c) => c.id !== id));
   }, []);
 
