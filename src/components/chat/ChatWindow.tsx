@@ -5,11 +5,13 @@ import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
 import { MessageBubble } from "@/components/chat/MessageBubble";
 import { ChatInput } from "@/components/chat/ChatInput";
+import { ModelSelect } from "@/components/chat/ModelSelect";
 import { TypingIndicator } from "@/components/chat/TypingIndicator";
 import { DisclaimerBanner } from "@/components/layout/DisclaimerBanner";
 import { emitConversationsRefresh } from "@/lib/events";
 import { takePendingFirstMessage } from "@/lib/pendingMessage";
 import { messageToUIMessage, type AppUIMessage } from "@/lib/ai/uiMessages";
+import { useChatModel } from "@/hooks/useChatModel";
 import type { Message } from "@/types";
 
 interface ChatWindowProps {
@@ -18,6 +20,8 @@ interface ChatWindowProps {
 }
 
 export function ChatWindow({ conversationId, initialMessages }: ChatWindowProps) {
+  const { modelId, setModelId, options: modelOptions } = useChatModel();
+
   const { messages, sendMessage, setMessages, status, error, regenerate, clearError } = useChat<AppUIMessage>({
     id: conversationId,
     messages: initialMessages,
@@ -44,9 +48,9 @@ export function ChatWindow({ conversationId, initialMessages }: ChatWindowProps)
     const pending = takePendingFirstMessage(conversationId);
     if (pending) {
       sentPendingRef.current = true;
-      sendMessage({ text: pending });
+      sendMessage({ text: pending }, { body: { model: modelId } });
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- run once per conversationId, not on every sendMessage identity change.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- run once per conversationId, not on every sendMessage/modelId identity change.
   }, [conversationId]);
 
   const isBusy = status === "submitted" || status === "streaming";
@@ -82,8 +86,14 @@ export function ChatWindow({ conversationId, initialMessages }: ChatWindowProps)
           </button>
         </div>
       )}
+      <div className="mx-auto w-full max-w-3xl px-4 pb-2">
+        <ModelSelect value={modelId} options={modelOptions} onChange={setModelId} disabled={isBusy} />
+      </div>
       <div className="mx-auto w-full max-w-3xl px-4 pb-4">
-        <ChatInput disabled={isBusy} onSend={(text) => sendMessage({ text })} />
+        <ChatInput
+          disabled={isBusy}
+          onSend={(text) => sendMessage({ text }, { body: { model: modelId } })}
+        />
       </div>
       <DisclaimerBanner />
     </div>

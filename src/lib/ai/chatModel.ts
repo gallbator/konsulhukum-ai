@@ -1,4 +1,5 @@
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
+import { DEFAULT_CHAT_MODEL_ID } from "@/lib/ai/models";
 
 /**
  * Single point of provider/model choice for the chat path.
@@ -9,8 +10,8 @@ const openrouter = createOpenRouter({
   apiKey: process.env.OPENROUTER_API_KEY,
 });
 
-export function getChatModel() {
-  return openrouter.chat(process.env.AI_CHAT_MODEL ?? "anthropic/claude-sonnet-4.5");
+export function getChatModel(modelId?: string) {
+  return openrouter.chat(modelId ?? process.env.AI_CHAT_MODEL ?? DEFAULT_CHAT_MODEL_ID);
 }
 
 export function getTitleModel() {
