@@ -1,11 +1,12 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { NewChatButton } from "@/components/sidebar/NewChatButton";
 import { ConversationList } from "@/components/sidebar/ConversationList";
 import { ThemeToggle } from "@/components/layout/ThemeToggle";
-import { ScaleIcon, MenuIcon, CloseIcon } from "@/components/ui/icons";
+import { ScaleIcon, MenuIcon, CloseIcon, FileTextIcon } from "@/components/ui/icons";
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -53,7 +54,18 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
         <NewChatButton />
         <ConversationList />
-        <div className="border-t border-border pt-2">
+        <div className="flex flex-col gap-0.5 border-t border-border pt-2">
+          <Link
+            href="/documents"
+            className={`flex items-center gap-2 rounded-md px-2.5 py-2 text-sm transition-colors ${
+              pathname === "/documents"
+                ? "bg-surface-hover text-foreground"
+                : "text-muted-foreground hover:bg-surface-hover hover:text-foreground"
+            }`}
+          >
+            <FileTextIcon className="h-4 w-4" />
+            Dokumen
+          </Link>
           <ThemeToggle />
         </div>
       </aside>
